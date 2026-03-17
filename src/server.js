@@ -1,5 +1,4 @@
 require('dotenv').config();
-const mongoose = require('mongoose');
 const app = require('./app');
 const { ensureStorageDirs, startCleanupScheduler } = require('./utils/fileUtils');
 
@@ -12,14 +11,22 @@ startCleanupScheduler();
 
 async function bootstrap() {
   if (!MONGODB_URI) {
-    throw new Error('Missing MONGODB_URI in environment variables');
+    console.warn('MONGODB_URI is missing. Starting backend without database connection.');
+  } else {
+    try {
+      // Lazy-load mongoose so incompatible runtime errors are caught in startup logs.
+      const mongoose = require('mongoose');
+      await mongoose.connect(MONGODB_URI, {
+        dbName: MONGODB_DB,
+      });
+      console.log('MongoDB connected ✅');
+    } catch (error) {
+      console.error(
+        'MongoDB connection failed. Starting backend without database.',
+        error && error.message ? error.message : error
+      );
+    }
   }
-
-  await mongoose.connect(MONGODB_URI, {
-    dbName: MONGODB_DB,
-  });
-
-  console.log('MongoDB connected ✅');
 
   app.listen(PORT, () => {
     console.log(`PDF Master backend running on http://localhost:${PORT}`);
@@ -27,6 +34,6 @@ async function bootstrap() {
 }
 
 bootstrap().catch((error) => {
-  console.error('Backend startup failed:', error.message);
+  console.error('Backend startup failed:', error && error.stack ? error.stack : error);
   process.exit(1);
 });

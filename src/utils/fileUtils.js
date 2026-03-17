@@ -2,8 +2,13 @@ const fs = require('fs');
 const path = require('path');
 
 const projectRoot = path.resolve(__dirname, '../..');
-const uploadsDir = path.join(projectRoot, 'storage/uploads');
-const outputsDir = path.join(projectRoot, 'storage/outputs');
+const baseStorageDir =
+  process.env.STORAGE_DIR ||
+  (process.env.NODE_ENV === 'production'
+    ? path.join('/tmp', 'pdf-master-storage')
+    : path.join(projectRoot, 'storage'));
+const uploadsDir = path.join(baseStorageDir, 'uploads');
+const outputsDir = path.join(baseStorageDir, 'outputs');
 
 function ensureStorageDirs() {
   fs.mkdirSync(uploadsDir, { recursive: true });
