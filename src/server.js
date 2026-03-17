@@ -10,6 +10,10 @@ ensureStorageDirs();
 startCleanupScheduler();
 
 async function bootstrap() {
+  app.listen(PORT, () => {
+    console.log(`PDF Master backend running on http://localhost:${PORT}`);
+  });
+
   if (!MONGODB_URI) {
     console.warn('MONGODB_URI is missing. Starting backend without database connection.');
   } else {
@@ -18,6 +22,7 @@ async function bootstrap() {
       const mongoose = require('mongoose');
       await mongoose.connect(MONGODB_URI, {
         dbName: MONGODB_DB,
+        serverSelectionTimeoutMS: 10000,
       });
       console.log('MongoDB connected ✅');
     } catch (error) {
@@ -27,10 +32,6 @@ async function bootstrap() {
       );
     }
   }
-
-  app.listen(PORT, () => {
-    console.log(`PDF Master backend running on http://localhost:${PORT}`);
-  });
 }
 
 bootstrap().catch((error) => {
