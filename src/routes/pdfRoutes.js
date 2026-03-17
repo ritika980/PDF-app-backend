@@ -7,6 +7,7 @@ const {
   imageToPdf,
   pdfToImage,
   officeToPdf,
+  addWatermark,
 } = require('../controllers/pdfController');
 
 const router = express.Router();
@@ -17,5 +18,6 @@ router.post('/compress', upload.single('file'), compressPdf);
 router.post('/image-to-pdf', upload.array('files'), imageToPdf);
 router.post('/pdf-to-image', upload.single('file'), pdfToImage);
 router.post('/office-to-pdf', upload.single('file'), officeToPdf);
+router.post('/watermark', upload.single('file'), addWatermark);
 
 module.exports = router;

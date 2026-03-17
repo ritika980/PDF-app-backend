@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const { execFile } = require('child_process');
 const { promisify } = require('util');
 const archiver = require('archiver');
-const { PDFDocument } = require('pdf-lib');
+const { PDFDocument, StandardFonts, rgb, degrees } = require('pdf-lib');
 
 const { parseRanges } = require('../utils/parseRanges');
 const { outputsDir, deleteFilesSafe, scheduleDelete } = require('../utils/fileUtils');
@@ -310,6 +310,63 @@ async function officeToPdf(req, res, next) {
   }
 }
 
+async function addWatermark(req, res, next) {
+  const file = req.file;
+  if (!file) {
+    return next(createHttpError(400, 'Please upload a PDF file.'));
+  }
+
+  if (file.mimetype !== 'application/pdf') {
+    deleteFilesSafe([file]);
+    return next(createHttpError(400, 'Only PDF file is allowed.'));
+  }
+
+  const watermarkText = String(req.body.watermarkText || '').trim() || 'PDF MASTER';
+  const opacityRaw = Number(req.body.watermarkOpacity);
+  const watermarkOpacity = Number.isFinite(opacityRaw)
+    ? Math.min(Math.max(opacityRaw, 0.05), 0.45)
+    : 0.14;
+
+  try {
+    const bytes = await fs.promises.readFile(file.path);
+    const pdfDoc = await PDFDocument.load(bytes);
+    const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+    const pages = pdfDoc.getPages();
+    for (const page of pages) {
+      const { width, height } = page.getSize();
+      const fontSize = Math.max(10, Math.min(22, Math.round(Math.min(width, height) * 0.03)));
+      const textWidth = font.widthOfTextAtSize(watermarkText, fontSize);
+      const marginX = Math.max(16, Math.round(width * 0.03));
+      const marginY = Math.max(14, Math.round(height * 0.025));
+
+      // Keep watermark in bottom-right margin to avoid covering document body content.
+      const x = Math.max(marginX, width - textWidth - marginX);
+      const y = marginY;
+
+      page.drawText(watermarkText, {
+        x,
+        y,
+        size: fontSize,
+        font,
+        color: rgb(0.12, 0.16, 0.23),
+        opacity: watermarkOpacity,
+        rotate: degrees(0),
+      });
+    }
+
+    const outputBytes = await pdfDoc.save({ useObjectStreams: true });
+    const outputPath = path.join(outputsDir, `watermark-${Date.now()}-${crypto.randomUUID()}.pdf`);
+    await fs.promises.writeFile(outputPath, outputBytes);
+
+    deleteFilesSafe([file]);
+    sendAndCleanup(res, outputPath, 'watermarked.pdf', 'application/pdf');
+  } catch (error) {
+    deleteFilesSafe([file]);
+    next(error);
+  }
+}
+
 module.exports = {
   mergePdf,
   splitPdf,
@@ -317,4 +374,5 @@ module.exports = {
   imageToPdf,
   pdfToImage,
   officeToPdf,
+  addWatermark,
 };
